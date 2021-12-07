@@ -2,11 +2,11 @@ use std::io::Cursor;
 
 use super::{BufferReadError, BufferWriteError};
 
-pub trait ReadByte {
+pub trait ReadUnsignedByte {
     fn read_unsigned_byte(&mut self) -> Result<u8, BufferReadError>;
 }
 
-impl<T: AsRef<[u8]>> ReadByte for Cursor<T> {
+impl<T: AsRef<[u8]>> ReadUnsignedByte for Cursor<T> {
     fn read_unsigned_byte(&mut self) -> Result<u8, BufferReadError> {
         let val = self.remaining_slice()[0];
         self.set_position(self.position() + 1);
@@ -14,11 +14,11 @@ impl<T: AsRef<[u8]>> ReadByte for Cursor<T> {
     }
 }
 
-pub trait WriteByte {
+pub trait WriteUnsignedByte {
     fn write_unsigned_byte(&mut self, byte: u8) -> Result<(), BufferWriteError>;
 }
 
-impl<T: AsMut<[u8]>> WriteByte for Cursor<T> {
+impl<T: AsMut<[u8]>> WriteUnsignedByte for Cursor<T> {
     fn write_unsigned_byte(&mut self, byte: u8) -> Result<(), BufferWriteError> {
         let pos = self.position();
         let buf = self.get_mut().as_mut();

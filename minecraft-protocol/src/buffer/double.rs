@@ -1,11 +1,11 @@
 use super::{BufferReadError, BufferWriteError};
 use std::io::Cursor;
 
-pub trait ReadFloat {
+pub trait ReadDouble {
     fn read_double(&mut self) -> Result<f64, BufferReadError>;
 }
 
-impl<T: AsRef<[u8]>> ReadFloat for Cursor<T> {
+impl<T: AsRef<[u8]>> ReadDouble for Cursor<T> {
     fn read_double(&mut self) -> Result<f64, BufferReadError> {
         let buf = self.remaining_slice();
         let val = f64::from_be_bytes(buf.try_into().unwrap());
@@ -14,11 +14,11 @@ impl<T: AsRef<[u8]>> ReadFloat for Cursor<T> {
     }
 }
 
-pub trait WriteFloat {
+pub trait WriteDouble {
     fn write_double(&mut self, double: f64) -> Result<(), BufferWriteError>;
 }
 
-impl<T: AsMut<[u8]>> WriteFloat for Cursor<T> {
+impl<T: AsMut<[u8]>> WriteDouble for Cursor<T> {
     fn write_double(&mut self, double: f64) -> Result<(), BufferWriteError> {
         let pos = self.position() as usize;
         let buf = &mut self.get_mut().as_mut()[pos..pos + 8];
