@@ -11,6 +11,7 @@ pub mod unsigned_byte;
 pub mod unsigned_short;
 pub mod var_int;
 pub mod var_long;
+pub mod string;
 
 #[derive(Debug)]
 pub struct BufferReadError {
@@ -55,4 +56,5 @@ pub mod prelude {
     pub use super::unsigned_short::{ReadUnsignedShort, WriteUnsignedShort};
     pub use super::var_int::{ReadVarInt, WriteVarInt};
     pub use super::var_long::{ReadVarLong, WriteVarLong};
+    pub use super::string::{ReadString, WriteString};
 }

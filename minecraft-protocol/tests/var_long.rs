@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use minecraft_protocol::buffer::var_long::{ReadVarLong, WriteVarLong};
+use minecraft_protocol::cursor::var_long::{ReadVarLong, WriteVarLong};
 
 #[allow(overflowing_literals)]
 #[rustfmt::skip]

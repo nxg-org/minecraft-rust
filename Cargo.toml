@@ -2,5 +2,6 @@
 members = [
     "minecraft-data",
     "minecraft-protocol",
+    "test-client",
 ]
 license = "GPL-3.0"

@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use minecraft_protocol::buffer::var_int::{ReadVarInt, WriteVarInt};
+use minecraft_protocol::cursor::var_int::{ReadVarInt, WriteVarInt};
 
 #[allow(overflowing_literals)]
 #[rustfmt::skip]
