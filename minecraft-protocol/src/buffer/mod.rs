@@ -36,10 +36,7 @@ pub struct BufferWriteError {
 
 impl Display for BufferWriteError {
     fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        println!(
-            "Error writing to buffer at byte position 0x{:x}",
-            self.pos
-        );
+        println!("Error writing to buffer at byte position 0x{:x}", self.pos);
         Ok(())
     }
 }

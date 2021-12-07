@@ -2,11 +2,6 @@ use std::io::Cursor;
 
 use minecraft_protocol::buffer::var_int::{ReadVarInt, WriteVarInt};
 
-// use minecraft_protocol::{
-//     buf_reader::{var_int::VarIntReader, BufReader},
-//     buf_writer::{var_int::VarIntWriter, BufWriter}, buffer::var_int::ReadVarInt,
-// };
-
 #[allow(overflowing_literals)]
 #[rustfmt::skip]
 const SAMPLEDATA: [(i32, &'static [u8]); 11] = [
@@ -34,9 +29,12 @@ fn test_read_wiki_vals() {
 fn test_write_wiki_vals() {
     for (val, res) in SAMPLEDATA {
         let mut buf = vec![0; 5];
-        let mut buf_writer = Cursor::new(&mut buf);
-        buf_writer.write_var_int(val).unwrap();
-        let index = buf_writer.position();
-        assert_eq!(&(buf_writer.get_ref().as_ref() as &[u8])[0..index as usize], res);
+        let mut cursor = Cursor::new(&mut buf);
+        cursor.write_var_int(val).unwrap();
+        let index = cursor.position();
+        assert_eq!(
+            &(cursor.get_ref().as_ref() as &[u8])[0..index as usize],
+            res
+        );
     }
 }

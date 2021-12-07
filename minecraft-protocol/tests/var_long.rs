@@ -29,11 +29,11 @@ fn test_read_wiki_vals() {
 fn test_write_wiki_vals() {
     for (val, res) in SAMPLEDATA {
         let mut buf = vec![0; 10];
-        let mut buf_writer = Cursor::new(&mut buf);
-        buf_writer.write_var_long(val).unwrap();
-        let index = buf_writer.position();
+        let mut cursor = Cursor::new(&mut buf);
+        cursor.write_var_long(val).unwrap();
+        let index = cursor.position();
         assert_eq!(
-            &(buf_writer.get_ref().as_ref() as &[u8])[0..index as usize],
+            &(cursor.get_ref().as_ref() as &[u8])[0..index as usize],
             res
         );
     }

@@ -1,6 +1,6 @@
 #![feature(cursor_remaining)]
-pub mod protocol_types;
 pub mod buffer;
+pub mod protocol_types;
 
 pub mod protocol {
     pub enum PacketDirection {

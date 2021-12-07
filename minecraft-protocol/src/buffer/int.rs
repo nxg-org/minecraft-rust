@@ -21,7 +21,7 @@ pub trait WriteInt {
 impl<T: AsMut<[u8]>> WriteInt for Cursor<T> {
     fn write_int(&mut self, integer: i32) -> Result<(), BufferWriteError> {
         let pos = self.position() as usize;
-        let buf = &mut self.get_mut().as_mut()[pos..pos+4];
+        let buf = &mut self.get_mut().as_mut()[pos..pos + 4];
         buf.copy_from_slice(&integer.to_be_bytes());
         self.set_position(self.position() + 4);
         Ok(())
