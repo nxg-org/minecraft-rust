@@ -1,13 +1,10 @@
 [package]
-name = "minecraft-protocol"
+name = "test-server"
 version = "0.1.0"
 edition = "2021"
-license = "GPL-3.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-byteorder = "1.4.3"
-bytes = "1.1.0"
-rand = "0.8.4"
+minecraft-protocol = { path = "../minecraft-protocol" }
 tokio = { version = "1.14.0", features = ["full"] }

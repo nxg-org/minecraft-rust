@@ -17,17 +17,25 @@ impl WriteMCVarInt for Vec<u8> {
         self
     }
     fn prefix_var_int(&mut self, var_int: i32) -> &mut Self {
-        let mut tmp = vec![];
-        tmp.write_var_int(var_int);
-        let len = self.len();
-        let tmp_len = tmp.len();
-        self.resize(tmp_len + len, 0);
-        self.copy_within(..len, tmp_len);
-        self[..tmp_len].copy_from_slice(&tmp[..]);
+        let own_len = self.len();
+        self.write_var_int(var_int);
+        let pref_len = self.len() - own_len;
+        let pref = self[own_len..].to_vec();
+        self.copy_within(..own_len, pref_len);
+        self[..pref_len].copy_from_slice(&pref);
         self
+        // let mut tmp = vec![];
+        // tmp.write_var_int(var_int);
+        // let len = self.len();
+        // let tmp_len = tmp.len();
+        // self.resize(tmp_len + len, 0);
+        // self.copy_within(..len, tmp_len);
+        // self[..tmp_len].copy_from_slice(&tmp[..]);
+        // self
     }
 }
-
+// [15, 245, 5, 9, 108, 111, 99, 97, 108, 104, 111, 115, 116, 99, 221, 1, 1, 0, 9, 1, 0, 0, 1, 125, 155, 63, 179, 233]
+// [15, 245, 5, 9, 108, 111, 99, 97, 108, 104, 111, 115, 116, 99, 221, 1, 1, 0, 9, 1, 0, 0, 1, 125, 155, 67, 108, 184]
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;

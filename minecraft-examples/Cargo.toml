@@ -1,10 +1,12 @@
 [package]
-name = "test-client"
+name = "minecraft-examples"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+bytes = "1.1.0"
+clap = { version = "3.0.0-rc.0", features = ["derive"] }
 minecraft-protocol = { path = "../minecraft-protocol" }
-tokio = { version = "1.14.0", features = ["full"] }
+tokio = "1.14.0"

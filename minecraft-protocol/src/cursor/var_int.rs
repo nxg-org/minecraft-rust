@@ -14,7 +14,7 @@ impl<T: AsRef<[u8]>> ReadVarInt for Cursor<T> {
             let cur_val = buf[i];
             val += ((cur_val & 0x7f) as u32) << (i * 7);
             if (cur_val & 0x80) == 0x00 {
-                self.set_position(self.position() + i as u64);
+                self.set_position(self.position() + i as u64 + 1);
                 break;
             }
             if i == 4 {
