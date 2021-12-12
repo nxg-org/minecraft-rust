@@ -1,14 +1,8 @@
-use std::{
-    io::Cursor,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use bytes::BufMut;
 use clap::Parser;
-use minecraft_protocol::{
-    cursor::{prelude::ReadVarInt, string::ReadString},
-    prelude::*,
-};
+use minecraft_protocol::{prelude::*, ReadMCNativeTypes};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
@@ -56,26 +50,23 @@ async fn main() -> tokio::io::Result<()> {
 
     let mut bmut = bytes::BytesMut::with_capacity(2097050);
     loop {
-        match socket.read_buf(&mut bmut).await? {
-            0 => break println!("Server closed connection."),
-            x => {
-                let packet_slice = &bmut.as_ref()[..x];
-                println!("read packet: {:?}", packet_slice);
-                let mut cursor = Cursor::new(packet_slice);
-                let packet_len = cursor.read_var_int().unwrap();
-                println!("packet length: {}", &packet_len);
-                if let Ok(packet_id) = cursor.read_var_int() {
-                    println!("packet_id: {}", packet_id);
-                    match packet_id {
-                        0 => {
-                            let resp = cursor.read_string().unwrap();
-                            println!("Response from Server:\n{}", &resp);
-                        }
-                        _ => println!("received packet other than server list ping response"),
-                    }
-                }
-                bmut.clear();
+        if let Ok(x) = socket.read_buf(&mut bmut).await {
+            if x == 0 {
+                break println!("Server closed connection.");
             }
+            println!("read packet: {:?}", bmut.as_ref());
+            let packet_len = bmut.get_var_int();
+            println!("packet length: {}", &packet_len);
+            let packet_id = bmut.get_var_int();
+            println!("packet_id: {}", packet_id);
+            match packet_id {
+                0 => {
+                    println!("Response from Server:\n{}", &bmut.get_str());
+                }
+                _ => println!("received packet other than server list ping response"),
+            }
+
+            bmut.clear();
         }
     }
     Ok(())
