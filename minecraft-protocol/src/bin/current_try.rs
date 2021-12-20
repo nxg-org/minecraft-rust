@@ -71,21 +71,6 @@ pub enum Encoding {
 }
 
 impl Namespace {
-    fn add_types<T: AsRef<str> + Clone>(
-        &mut self,
-        types: &HashMap<T, Value>,
-        mut cx: TypeContext,
-    ) -> Option<()> {
-        for (t_name, t_val) in types {
-            if let None = self.get_type(t_name.as_ref()) {
-                self.types.insert(
-                    t_name.as_ref().to_owned(),
-                    Type::new(&t_val, &mut cx, Some(t_name)).unwrap(),
-                );
-            }
-        }
-        Some(())
-    }
     fn get_type<T: AsRef<str>>(&self, name: T) -> Option<&Type> {
         self.types.get(name.as_ref())
     }
@@ -187,13 +172,6 @@ impl NamespaceStore {
             }
         }
         None
-    }
-    pub fn add_types(&mut self, types: HashMap<String, serde_json::Value>, cx: TypeContext) {
-        self.store
-            .get_mut(&cx.1.clone())
-            .unwrap()
-            .add_types(&types, cx);
-        todo!()
     }
 }
 
