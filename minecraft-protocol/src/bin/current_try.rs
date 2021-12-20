@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use minecraft_data::FromVersion;
+use minecraft_data::{FromVersion, prelude::SUPPORTED_VERSIONS};
 use serde_json::*;
 
 mod json {
@@ -186,7 +186,6 @@ impl NamespaceStore {
                 }
             }
         }
-        println!("{}", name);
         None
     }
     pub fn add_types(&mut self, types: HashMap<String, serde_json::Value>, cx: TypeContext) {
@@ -314,7 +313,6 @@ impl Type {
                         let obj = params.as_object().unwrap();
                         let mut fields = HashMap::new();
                         for (switch_ident, switch_type) in obj.get("fields").unwrap().as_object().unwrap() {
-                            println!("{:#?}", (switch_ident, switch_type));
                             fields.insert(switch_ident.to_owned(), Type::new::<T>(switch_type, cx, None).unwrap());
                         };
                         Type::Switch{
@@ -339,7 +337,6 @@ impl Type {
                             }
                         } else {Encoding::Utf8};
                         if let Some(a) = obj.get("countType") {
-                            println!("{:#?}", a);
                             Type::PrefixedString{
                                 count_type: Box::new(Type::new::<T>(a,cx, None).unwrap()),
                                 encoding
@@ -446,18 +443,69 @@ pub struct ProtocolStore {
     pub ns_vec: Vec<NamespaceStore>,
 }
 
-pub enum UniversalField{
-    Same(Type),
-
+#[derive(Clone)]
+pub struct UniversalField {
+    variations: Vec<Type>,
+    optional: bool,
 }
 
-pub type UniversalFields = HashMap<String, UniversalField>;
+impl From<Type> for UniversalField {
+    fn from(t: Type) -> Self {
+        Self{
+            variations: vec![t],
+            optional: false
+        }
+    }
+}
 
+impl UniversalField {
+    pub fn add_version_specific(&mut self, r#type: Option<&Type>) {
+        match r#type {
+            Some(t) => self.variations.push(t.to_owned()),
+            None => self.optional = true,
+        }
+    }
+}
 
+#[derive(Clone)]
+pub struct UniversalFields(usize, HashMap<String, UniversalField>);
+
+impl UniversalFields {
+    pub fn add_version_fields(&mut self, fields: HashMap<String, Type>) {
+        if self.0 == 0 {
+            self.1 = fields
+                .into_iter()
+                .map(|(field_ident, field_type)| (field_ident, UniversalField::from(field_type)))
+                .collect::<HashMap<_, _>>();
+        } else {
+            let mut existing = self
+                .1
+                .clone()
+                .into_iter()
+                .map(|(s, _)| s)
+                .collect::<Vec<_>>();
+            fields.iter().for_each(|(s, _)| {
+                if !existing.contains(&s) {
+                    existing.push(s.clone())
+                }
+            });
+            for field_ident in existing {
+                if let Some(field) = self.1.get_mut(&field_ident) {
+                    field.add_version_specific(fields.get(&field_ident));
+                } else {
+                    let mut field: UniversalField = fields.get(&field_ident).unwrap().to_owned().into();
+                    field.add_version_specific(None);
+                    self.1.insert(field_ident, field);
+                }
+            }
+        }
+    }
+}
 
 fn main() {
-    for v in ["1.12.2", "1.17.1", "1.8"] {
-        let s = NamespaceStore::from_version(v).unwrap();
-        println!("{:#?}", &s);
+    let mut nss_arr = vec![];
+    for v in SUPPORTED_VERSIONS {
+        nss_arr.push(NamespaceStore::from_version(v).unwrap());
     }
+    println!("{:#?}", nss_arr);
 }
