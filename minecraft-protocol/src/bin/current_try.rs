@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use minecraft_data::{FromVersion, prelude::SUPPORTED_VERSIONS};
+use minecraft_data::{prelude::SUPPORTED_VERSIONS, FromVersion};
 use serde_json::*;
 
 mod json {
@@ -12,6 +12,11 @@ mod json {
     use serde::{Deserialize, Serialize};
     use std::collections::HashMap;
 
+    /**
+     * ProtoDef Namespaces
+     * https://github.com/ProtoDef-io/ProtoDef/blob/master/doc/protocol.md#protocol
+     * directly taken from the protocol.json files found in minecraft-data
+     */
     #[derive(Clone, PartialEq, Debug, Default, Deserialize, Serialize)]
     pub struct Namespace {
         #[serde(default)]
@@ -19,6 +24,7 @@ mod json {
         #[serde(flatten)]
         pub sub: HashMap<String, Namespace>,
     }
+
     impl FromMCDataVersionDir for Namespace
     where
         Self: Sized,
@@ -40,26 +46,50 @@ mod json {
     }
 }
 
+// Type aliases to distinguish certain kinds of identifying strings
 pub type MapperCase = String;
 pub type ContainerFieldIdent = String;
+
+/**
+ * Parts of the Container
+ * anonymous ones don't have a name,
+ * all have a type
+ * ContainerFields are written one after the other
+ */
 #[derive(Clone, Debug, PartialEq)]
 pub struct ContainerField {
     pub name: Option<String>,
     pub r#type: Type,
 }
 
+/**
+ * A BitfieldSection reflects an integer of
+ * a certain size of bits inside of a bitfield
+ * Equivalent to Java's BitSet
+ * https://docs.oracle.com/javase/8/docs/api/java/util/BitSet.html
+ */
 #[derive(Clone, PartialEq, Debug)]
 pub struct BitfieldSection {
     pub name: ContainerFieldIdent,
     pub size: usize,
     pub signed: bool,
 }
+
+/**
+ * More rust-y representation of the ProtoDef Namespaces
+ * https://github.com/ProtoDef-io/ProtoDef/blob/master/doc/protocol.md#protocol
+ * Namespaces are collected under different paths inside of NamespaceStores
+ */
 #[derive(Clone, Debug, Default)]
 pub struct Namespace {
     pub sub: Vec<String>,
     pub types: HashMap<String, Type>,
 }
 
+/**
+ * Represents different kinds of String Encoding that are possible
+ * __UNFINISHEDLIST exists because this enum is not exhaustive
+ */
 #[derive(Clone, PartialEq, Debug, Default)]
 pub enum Encoding {
     #[default]
@@ -76,11 +106,19 @@ impl Namespace {
     }
 }
 
+/**
+ * The NamespaceStore represents a Protocol
+ * it organizes the Namespaces by Paths
+ */
 #[derive(Default, Debug)]
 pub struct NamespaceStore {
     pub store: HashMap<PathBuf, Namespace>,
 }
 
+/**
+ * A TypeContext serves to look up Types in a Namespace
+ * inside of a NamespaceStore identified by its Path
+ */
 #[derive(Debug)]
 pub struct TypeContext<'a>(
     &'a mut NamespaceStore,
@@ -89,6 +127,12 @@ pub struct TypeContext<'a>(
 );
 
 impl TypeContext<'_> {
+    /**
+     * serves to look up a type recursively down the Path
+     * of the Namespace the type is in
+     * does not throw an error if an invalid path is provided
+     * as long as the type alias exists in the root Namespace
+     */
     pub fn get_type<T: AsRef<str>>(&mut self, name: T) -> Option<Type> {
         for a in self.1.ancestors() {
             if let Some(ns) = self.0.get_namespace(a) {
@@ -173,6 +217,12 @@ impl NamespaceStore {
         }
         None
     }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum TypeRef {
+    Type(Type),
+    Ref(PathBuf, String),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -416,6 +466,18 @@ impl Type {
     // }
 }
 
+/**
+ * Serves to define how a native Type is handled
+ */
+pub struct NativeType {}
+
+lazy_static::lazy_static! {
+    pub static ref NATIVE_TYPE_MAP: HashMap<String, &'static NativeType> = {
+        let ret = HashMap::default();
+        ret
+    };
+}
+
 #[derive(Debug, Default)]
 pub struct ProtocolStore {
     pub ns_vec: Vec<NamespaceStore>,
@@ -429,9 +491,9 @@ pub struct UniversalField {
 
 impl From<Type> for UniversalField {
     fn from(t: Type) -> Self {
-        Self{
+        Self {
             variations: vec![t],
-            optional: false
+            optional: false,
         }
     }
 }
@@ -471,7 +533,8 @@ impl UniversalFields {
                 if let Some(field) = self.1.get_mut(&field_ident) {
                     field.add_version_specific(fields.get(&field_ident));
                 } else {
-                    let mut field: UniversalField = fields.get(&field_ident).unwrap().to_owned().into();
+                    let mut field: UniversalField =
+                        fields.get(&field_ident).unwrap().to_owned().into();
                     field.add_version_specific(None);
                     self.1.insert(field_ident, field);
                 }
@@ -481,9 +544,9 @@ impl UniversalFields {
 }
 
 fn main() {
-    let mut nss_arr = vec![];
-    for v in SUPPORTED_VERSIONS {
-        nss_arr.push(NamespaceStore::from_version(v).unwrap());
-    }
+    let nss_arr: Vec<_> = SUPPORTED_VERSIONS
+        .iter()
+        .map(|v| NamespaceStore::from_version(v).unwrap())
+        .collect();
     println!("{:#?}", nss_arr);
 }

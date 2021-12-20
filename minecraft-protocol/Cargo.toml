@@ -17,6 +17,7 @@ serde_json = "1.0.73"
 tokio = { version = "1.14.0", features = ["full"] }
 minecraft-data = {path = "../minecraft-data"}
 proc-macro2 = "1.0.34"
+lazy_static = "1.4.0"
 
 [build-dependencies]
 convert_case = "0.4.0"
