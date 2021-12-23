@@ -198,3 +198,127 @@ pub mod gen {
 
 }
 ```
+
+HashMap<String, Fn(&mut ProtoDef, field_path) ->  >
+
+IndexMap<Path, Type>
+
+struct Type {
+    parsing_code: |field_name| proc_macro2::TokenStream,
+    writing_code: |field_name| proc_macro2::TokenStream,
+    type: proc_macro2::Ident
+}
+
+fn parse_packet_that(buf: Bytes){
+    let r#type = buf.get_var_int();
+    match r#type {
+
+}
+
+1.
+field is not anonymous => whatever type returns is going to be scoped
+as "/type"
+
+
+=> insert("/type", i32)
+2. 
+
+
+pub type Native = Box<dyn Fn(&mut ProtoDefRoot, PathBuf, &mut IndexMap<PathBuf, Type>, PathBuf, options: HashMap<String, serde_json::Value>) -> Option<Native>>;
+
+NATIVES {
+    "varint" = 
+        |pds: &mut Protodef, pds_path: Path, index_map: &mut IndexMap, index_map_path: Path, options: HashMap<String, serde_json::Value>| -> Option<Self> {
+            index_map.insert(index_map_path, Type{
+                parsing_code: 
+                    |field_name| {
+                        quote::quote!{
+                            let #field_name = buf.get_var_int();
+                        },
+                    },
+                writing_code:
+                    |field_name| {
+                        quote::quote!{
+                            buf.put_var_int(#field_name);
+                        }
+                    },
+                type: proc_macro2::Ident(i32, Span::here())
+            })
+            None
+        }
+    "switch" =
+        |pds: &mut Protodef, pds_path: Path, index_map: &mut IndexMap, index_map_path: Path, options: HashMap<String, serde_json::Value>| -> Option<Self> {
+            let placeholder_arguments: HashMap<String, String> = Default::default();
+            let enum_code = proc_macro2::TokenStream::default();
+            match options.get("compareTo") {
+                Some(v) => {
+                    if v.starts_with("$") {
+                        placeholder_arguments.insert(v - "$", "compareTo");
+                    } else {
+                        let field_name = v;
+                        let fields = options.get("fields").unwrap().as_object().unwrap();
+                        enum_code.extend(
+                            quote::quote!{
+                                match r#type {
+                            }
+                        );
+                        for (field_matcher, field_type) of fields {
+                            let (field_type, field_path) = lookup_type(field_type, ...);
+                            enum_code.extend(
+                                quote::quote!{ #field_matcher => { }
+                            );
+
+/
+                        }
+                    }
+                },
+                None => match options.get("compareToValue") {
+                    Some(v) => {
+/
+                    },
+                    None => panic!(),
+                }
+            }
+            if placeholder_arguments.length > 0 {
+                return Some(|pds: &mut Protodef, pds_path: Path, index_map: &mut IndexMap, index_map_path: Path, placeholder_options: HashMap<String, serde_json::Value>| {
+                    for (alias, insertto) in placeholder_arguments {
+                        options.insert(insertto, placeholder_options.get(alias).unwrap());
+                    }
+/
+                })
+            }
+            None
+        }
+}
+
+
+/*
+{
+  "compareTo":"type",
+  "fields":{
+    "0":[
+      "container",
+      [
+        {
+          "name": "displayedRecipe",
+          "type": "i32"
+        }
+      ]
+    ],
+    "1": [
+      "container",
+      [
+        {
+          "name": "craftingBookOpen",
+          "type": "bool"
+        },
+        {
+          "name": "craftingFilter",
+          "type": "bool"
+        }
+      ]
+    ]
+  }
+}*/
+
+
