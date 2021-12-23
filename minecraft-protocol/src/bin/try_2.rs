@@ -14,7 +14,7 @@ mod json {
 
     /**
      * ProtoDef Namespaces
-     * https://github.com/ProtoDef-io/ProtoDef/blob/master/doc/protocol.md#protocol
+     * <https://github.com/ProtoDef-io/ProtoDef/blob/master/doc/protocol.md#protocol>
      * directly taken from the protocol.json files found in minecraft-data
      */
     #[derive(Clone, PartialEq, Debug, Default, Deserialize, Serialize)]
@@ -66,7 +66,7 @@ pub struct ContainerField {
  * A BitfieldSection reflects an integer of
  * a certain size of bits inside of a bitfield
  * Equivalent to Java's BitSet
- * https://docs.oracle.com/javase/8/docs/api/java/util/BitSet.html
+ * <https://docs.oracle.com/javase/8/docs/api/java/util/BitSet.html>
  */
 #[derive(Clone, PartialEq, Debug)]
 pub struct BitfieldSection {
@@ -77,7 +77,7 @@ pub struct BitfieldSection {
 
 /**
  * More rust-y representation of the ProtoDef Namespaces
- * https://github.com/ProtoDef-io/ProtoDef/blob/master/doc/protocol.md#protocol
+ * <https://github.com/ProtoDef-io/ProtoDef/blob/master/doc/protocol.md#protocol>
  * Namespaces are collected under different paths inside of NamespaceStores
  */
 #[derive(Clone, Debug, Default)]
@@ -488,6 +488,7 @@ pub struct UniversalField {
     variations: Vec<Type>,
     optional: bool,
 }
+
 
 impl From<Type> for UniversalField {
     fn from(t: Type) -> Self {

@@ -3,6 +3,7 @@
 use bytes::{Buf, BufMut};
 pub mod proto_gen;
 pub mod protocol_types;
+pub mod protodef;
 
 pub trait WriteMCNativeTypes {
     fn put_var_int(&mut self, var_int: i32);

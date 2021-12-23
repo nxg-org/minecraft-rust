@@ -1,0 +1,138 @@
+use std::{collections::HashMap, path::PathBuf};
+
+fn main() {
+    // let nss_arr: Vec<_> = SUPPORTED_VERSIONS
+    //     .iter()
+    //     .map(|v| NamespaceStore::from_version(v).unwrap())
+    //     .collect();
+    // println!("{:#?}", nss_arr);
+}
+
+mod json {
+    use minecraft_data::{prelude::MINECRAFT_DATA_DIR, FromMCDataVersionDir};
+    use serde::{Deserialize, Serialize};
+    use std::collections::HashMap;
+
+    /**
+     * ProtoDef Namespaces
+     * https://github.com/ProtoDef-io/ProtoDef/blob/master/doc/protocol.md#protocol
+     * directly taken from the protocol.json files found in minecraft-data
+     */
+    #[derive(Clone, PartialEq, Debug, Default, Deserialize, Serialize)]
+    pub struct Namespace {
+        #[serde(default)]
+        pub types: HashMap<String, serde_json::Value>,
+        #[serde(flatten)]
+        pub sub: HashMap<String, Namespace>,
+    }
+
+    impl FromMCDataVersionDir for Namespace
+    where
+        Self: Sized,
+    {
+        fn from_version_paths(paths: &HashMap<String, String>) -> Option<Self> {
+            let mut path = std::path::PathBuf::from(paths.get("protocol").unwrap());
+            path.push("protocol.json");
+            Some(
+                serde_json::from_str(
+                    MINECRAFT_DATA_DIR
+                        .get_file(path)
+                        .unwrap()
+                        .contents_utf8()
+                        .unwrap(),
+                )
+                .unwrap(),
+            )
+        }
+    }
+}
+
+mod protodef {
+    use std::{collections::HashMap, path::PathBuf};
+
+    // pub type FieldName = String;
+
+    pub type TypeIdentifier = String;
+
+    // pub enum Type {
+    //     Reference {
+    //         namespace: NameSpaceIdentifier,
+    //         r#type: TypeIdentifier,
+    //     },
+    //     Call {
+    //         fields: HashMap<FieldName, Type>,
+    //     },
+    //     ComplexWrapper {},
+    // }
+
+    pub type NameSpaceIdentifier = PathBuf;
+
+    pub struct Namespace<Type> {
+        types: HashMap<String, Type>,
+    }
+
+    pub struct ProtoDef<Type> {
+        namespaces: HashMap<NameSpaceIdentifier, Namespace<Type>>,
+    }
+
+    pub type FieldName = proc_macro2::Ident;
+    pub type FieldType = proc_macro2::Ident;
+
+    #[derive(Clone, Debug)]
+    pub struct Field<Type> {
+        name: Option<String>,
+        r#type: Type,
+    }
+
+    #[derive()]
+    pub enum ProtoDefType {
+        Ref(String),
+        Container(Vec<Field<ProtoDefType>>),
+        Call(Box<dyn Fn(HashMap<String, ProtoDefType>) -> ProtoDefType>),
+        // Call(Box<dyn Fn(TypeDef) -> Type>),
+    }
+
+    pub struct TypeDef {
+        fields: HashMap<FieldName, FieldType>,
+        parsing_code: proc_macro2::TokenStream,
+    }
+
+    pub struct TypeContext<'a, Type> {
+        pub pd_ref: &'a mut ProtoDef<Type>,
+        pub path: PathBuf,
+    }
+
+    impl<'a, Type> From<(&'a mut ProtoDef<Type>, PathBuf)> for TypeContext<'a, Type> {
+        fn from((pd_ref, path): (&'a mut ProtoDef<Type>, PathBuf)) -> Self {
+            Self { pd_ref, path }
+        }
+    }
+
+    impl<Type> TypeContext<'_, Type> {
+        pub fn lookup_type(&mut self, name: &String) -> Option<Type> {
+            for ancestor in self.path.ancestors() {
+                if let Some(namespace) = self.pd_ref.namespaces.get_mut(ancestor) {
+                    if let Some(r#type) = namespace.types.get(name) {
+                        return Some(r#type.clone());
+                    }
+                };
+            }
+            None
+        }
+    }
+
+    // impl Type {
+    //     pub fn resolve(&self, cx: TypeContext) -> Type {
+    //         match self {
+    //             Type::Ref(name) => cx.lookup_type(name).unwrap(),
+    //             Type::Call(r#fn) => (r#fn)(),
+    //             Type::Def {
+    //                 fields,
+    //                 parsing_code,
+    //             } => todo!(),
+    //         }
+    //     }
+
+    //     // fn resolve_def() -> Option<Type> {}
+    // }
+}
