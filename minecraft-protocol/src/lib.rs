@@ -1,5 +1,5 @@
 #![feature(derive_default_enum)]
-
+#![feature(unboxed_closures, fn_traits)]
 use bytes::{Buf, BufMut};
 pub mod proto_gen;
 pub mod protocol_types;
