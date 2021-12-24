@@ -322,3 +322,81 @@ NATIVES {
 }*/
 
 
+
+##### types
+
+how to build them from pds
+
+1. call get type on pds_context
+2. call get type on all children
+
+{
+
+}
+
+
+
+
+
+
+
+
+HashMap<PathBuf, Type>
+"/play/to_client/packet" => Type::Container([
+    {
+        name: "name", 
+        type: Type::Call(
+            Box(Type::Reference("mapper")),
+            {"type": "varint","mappings":{}}
+        )
+    },
+    {
+        anon: true,
+        type: Type::Call(
+            Box(Type::Reference("switch")),
+            {
+                "compareTo": "name",
+                "fields": {}
+            }
+        )
+    }
+])
+
+
+pub enum Type {
+    Reference(String),
+    Container(Vec<Field>),
+    Call(Box<Type>, serde_json::Value),
+}
+
+
+
+
+
+
+IndexMap<String, >
+
+
+
+
+
+
+struct #aaa {
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
