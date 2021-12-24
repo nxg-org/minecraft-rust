@@ -1,0 +1,77 @@
+#![feature(extend_one)]
+use std::{path::PathBuf, str::FromStr, collections::HashMap};
+
+use indexmap::IndexMap;
+use minecraft_data::FromVersion;
+use minecraft_protocol::protodef::*;
+
+fn main() {
+    let pds = pds::ProtoDef::from_version("1.12.2").unwrap();
+    let p = PathBuf::from_str("/play/toClient/packet").unwrap();
+    println!("{:#?}", pds.0.get(&p).unwrap());
+}
+
+pub enum TypeDeclarationCode{
+    Struct(IndexMap<String, TypeDeclarationCode>),
+    Enum(Vec<TypeDeclarationCode>),
+    Option(Box<TypeDeclarationCode>),
+    Single(proc_macro2::Ident),
+}
+
+impl TypeDeclarationCode {
+    pub fn get_code(&self, out_name: String) -> proc_macro2::TokenStream {
+        let ret = proc_macro2::TokenStream::default();
+        match self {
+            TypeDeclarationCode::Struct(fields) => {
+                ret.extend(proc_macro2::Group::new(
+                    proc_macro2::Delimiter::Brace, 
+                    fields.into_iter().map(
+                        |(field_name, field_type)| {
+                            let ret = quote::quote! {#field_name: };
+                            
+                            ret.extend(field_type.get_code(field_name.to_owned()));
+                            ret
+                    }).collect()).stream())
+            },
+            TypeDeclarationCode::Enum(_) => todo!(),
+            TypeDeclarationCode::Option(b) => {
+                
+            },
+            TypeDeclarationCode::Single(_) => todo!(),
+        };
+        ret
+    }
+}
+
+pub struct CodeGenType {
+    parsing_code_gen: gen::CodeGenFn,
+    writing_code_gen: gen::CodeGenFn,
+    declaration_code: TypeDeclarationCode
+}
+
+pub struct TypeBuilder {
+    pub field_paths: IndexMap<PathBuf, proc_macro2::Ident>
+    pub type_store: HashMap<proc_macro2::Ident, CodeGenType>
+}
+
+pub struct StructBuilder {
+    pub fields: IndexMap<String, proc_macro2::Ident>,
+}
+
+pub struct PdsContext<'a> {
+    r#ref: &'a mut pds::ProtoDef,
+    path: PathBuf,
+}
+
+impl PdsContext<'_> {
+    pub fn resolve_reference(&mut self, name: String) -> Option<pds::Type> {
+        for ancestor in self.path.ancestors() {
+            let mut path = ancestor.to_owned();
+            path.push(&name);
+            if let Some(t) = self.r#ref.0.get(&path) {
+                return Some(t.to_owned());
+            };
+        }
+        None
+    }
+}

@@ -7,6 +7,13 @@ pub type CodeGenFn = Box<dyn Fn(String) -> proc_macro2::TokenStream>;
 
 pub type TypeStore = HashMap<proc_macro2::Ident, Type>;
 
+pub enum RustType {
+    Struct(IndexMap<String, RustType>),
+    Enum(Vec<RustType>),
+    Option(Box<RustType>),
+    Single(proc_macro2::Ident),
+}
+
 pub struct Type {
     pub parsing_code: CodeGenFn,
     pub writing_code: CodeGenFn,
@@ -16,6 +23,8 @@ pub struct Type {
 
 pub type Fields = IndexMap<String, proc_macro2::Ident>;
 
+type Cx<'a, Tree> = (&'a mut Tree, PathBuf);
+
 lazy_static::lazy_static!(
     pub static ref BUILTIN_NATIVES: HashMap<&'static str, TypeGenFn<'static>> = {
         let mut ret: HashMap<&'static str, TypeGenFn> = HashMap::default();
@@ -23,14 +32,12 @@ lazy_static::lazy_static!(
         macro_rules! get_natives {
             ($($native_name:expr => $native_fun_name:ident $buf_getter:ident $buf_putter:ident $rstype:expr)+) => {
                 $(fn $native_fun_name<'a>(
-                    _: &'a mut super::pds::ProtoDef,
-                    _: PathBuf,
-                    index_map: &'a mut indexmap::IndexMap<PathBuf, Type>,
-                    index_map_path: PathBuf,
-                    _: HashMap<String, serde_json::Value>,
+                    _: Cx<'a, super::pds::ProtoDef>,
+                    index_map_cx: Cx<'a, indexmap::IndexMap<PathBuf, Type>>,
+                    _: serde_json::Value,
                 ) -> Option<TypeGenFn<'a>> {
-                    index_map.insert(
-                        index_map_path,
+                    index_map_cx.0.insert(
+                        index_map_cx.1,
                         Type {
                             parsing_code: Box::new(|field_name| {
                                 quote::quote! {
@@ -74,15 +81,26 @@ lazy_static::lazy_static!(
     };
 );
 
+// {
+//     u8: {
+//         code_gen: || {},
+
+//     }
+// }
+
+// {
+//     "/a" : u8,
+//     "/b" : String,
+//     "/"
+// }
+
 pub struct TypeGenFn<'a>(
     Box<
         dyn FnMut<
                 (
-                    &'a mut super::pds::ProtoDef,
-                    PathBuf,
-                    &'a mut indexmap::IndexMap<PathBuf, Type>,
-                    PathBuf,
-                    HashMap<String, serde_json::Value>,
+                    Cx<'a, super::pds::ProtoDef>,
+                    Cx<'a, indexmap::IndexMap<PathBuf, Type>>,
+                    serde_json::Value,
                 ),
                 Output = Option<TypeGenFn<'a>>,
             > + Send
@@ -92,56 +110,78 @@ pub struct TypeGenFn<'a>(
 );
 
 fn native_switch<'a>(
-    pds: &'a mut super::pds::ProtoDef,
-    pds_path: PathBuf,
-    index_map: &'a mut indexmap::IndexMap<PathBuf, Type>,
-    index_map_path: PathBuf,
-    mut options: HashMap<String, serde_json::Value>,
+    pds_cx: Cx<'a, super::pds::ProtoDef>,
+    index_map_cx: Cx<'a, indexmap::IndexMap<PathBuf, Type>>,
+    mut raw_options: serde_json::Value,
 ) -> Option<TypeGenFn<'a>> {
+    let options = raw_options.as_object().unwrap();
     let mut placeholder_arguments: HashMap<String, String> = Default::default();
+    let mut add_placeholder_arg = |old: &str, dollar_ref: &String| {
+        placeholder_arguments.insert(dollar_ref[1..].to_string(), old.to_owned());
+    };
     let mut enum_code = proc_macro2::TokenStream::default();
     match options.get("compareTo") {
-        Some(v) => {
-            if let Some(s) = v.as_str() {
-                if s.starts_with("$") {
-                    placeholder_arguments
-                        .insert((&s[1..]).to_string(), "compareTo".to_string().to_string());
-                } else {
-                    let field_name = s;
-                    let fields = options.get("fields").unwrap().as_object().unwrap();
-                    enum_code.extend(quote::quote! {
-                        match r#type
-                    });
-                    for (field_matcher, field_type) in fields {
-                        // let (field_type, field_path) = todo!();
-                        // // lookup_type(field_type, ...);
-                        // enum_code.extend(quote::quote! { #field_matcher => { } });
-                    }
-                }
+        Some(serde_json::Value::String(s)) if s.starts_with("$") => {
+            add_placeholder_arg("compareTo", s)
+        }
+        Some(serde_json::Value::String(s)) => {
+            let field_name = s;
+            let fields = options.get("fields").unwrap().as_object().unwrap();
+            enum_code.extend(quote::quote! {
+                match r#type
+            });
+            for (field_matcher, field_type) in fields {
+                // let (field_type, field_path) = todo!();
+                // // lookup_type(field_type, ...);
+                // enum_code.extend(quote::quote! { #field_matcher => { } });
             }
         }
-        None => match options.get("compareToValue") {
+        _ => match options.get("compareToValue") {
+            Some(serde_json::Value::String(s)) if s.starts_with("$") => {
+                add_placeholder_arg("compareToValue", s)
+            }
             Some(v) => {}
             None => panic!(),
         },
     }
     if placeholder_arguments.len() > 0 {
         Some(TypeGenFn(Box::new(
-            move |pds: &mut HashMap<PathBuf, super::pds::Type>,
-                  pds_path: PathBuf,
-                  index_map: &mut IndexMap<PathBuf, Type>,
-                  index_map_path: PathBuf,
-                  placeholder_options: HashMap<String, serde_json::Value>| {
+            move |pds_cx: Cx<super::pds::ProtoDef>,
+                  index_map_cx: Cx<IndexMap<PathBuf, Type>>,
+                  placeholder_options: serde_json::Value| {
                 for (alias, insertto) in &placeholder_arguments {
-                    options.insert(
-                        insertto.clone(),
-                        placeholder_options.get(&alias.to_owned()).unwrap().clone(),
-                    );
+                    if let Some(obj) = raw_options.as_object_mut() {
+                        obj.insert(
+                            insertto.clone(),
+                            placeholder_options.get(&alias.to_owned()).unwrap().clone(),
+                        );
+                    }
                 }
-                None
+                native_switch(pds_cx, index_map_cx, raw_options.to_owned())
             },
         )))
     } else {
         None
     }
+}
+
+impl Into<proc_macro2::TokenStream> for super::pds::ProtoDef {
+    fn into(self) -> proc_macro2::TokenStream {
+        todo!()
+    }
+}
+
+fn a(pds_cx: Cx<super::pds::ProtoDef>, type_name: String) {
+    let a = pds_cx
+        .0 
+        .0
+        .get(&pds_cx.1).unwrap();
+    
+    match a {
+        super::pds::Type::Reference(ref_name) => todo!(),
+        super::pds::Type::Container(_) => todo!(),
+        super::pds::Type::Call(_, _) => todo!(),
+    }
+
+    todo!()
 }

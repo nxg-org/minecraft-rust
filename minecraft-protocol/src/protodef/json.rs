@@ -36,3 +36,11 @@ where
         )
     }
 }
+
+#[test]
+fn test() {
+    use minecraft_data::FromVersion;
+    for v in minecraft_data::supported_versions::SUPPORTED_VERSIONS {
+        println!("{:#?}", ProtoDef::from_version(v).unwrap());
+    }
+}

@@ -157,7 +157,7 @@ mod tests {
     const STRING_SAMPLEDATA: [(&'static str, &'static [u8]); 3] = [
         ("welcome to the test", b"\x13welcome to the test"),
         ("this has to be a little longer string so that we can check if it works when the var_int length changes... writing tests is really fun, isn't it?", b"\x90\x01this has to be a little longer string so that we can check if it works when the var_int length changes... writing tests is really fun, isn't it?"),
-        ("some weird utf8 characters: äöü {} ßœæé€²¼⅐™", b"\x33some weird utf8 characters: \xE4\xF6\xFC {} \xDF\xC5\x93\xE6\xE9\xE2\x82\xAC\xB2\xBC\xE2\x85\x90\xE2\x84\xA2")
+        ("some weird utf8 characters: äöü {} ßœæé€²¼⅐™", b";some weird utf8 characters: \xc3\xa4\xc3\xb6\xc3\xbc {} \xc3\x9f\xc5\x93\xc3\xa6\xc3\xa9\xe2\x82\xac\xc2\xb2\xc2\xbc\xe2\x85\x90\xe2\x84\xa2")
     ];
 
     #[test]

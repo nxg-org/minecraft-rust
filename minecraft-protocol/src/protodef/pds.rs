@@ -1,21 +1,26 @@
 use std::{collections::HashMap, path::PathBuf};
 
+use minecraft_data::FromVersion;
+
+use super::json;
+
 /**
- * ProtoDefRoot represents the root of a protodef
+ * pds::ProtoDef represents the root of a protodef
  * specification in a pds file format. Every Type
  * appearing will here be indexed by a path of
  * namespaces it is contained in
  */
-pub type ProtoDef = HashMap<PathBuf, Type>;
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct ProtoDef(pub HashMap<PathBuf, Type>);
 
 /**
- * TypeRoot represents any kind of Type value in the
+ * pds::Type represents any kind of Type value in the
  * protocol, be it as a native declaration in the top
  * level namespace's types or a reference to those in
  * the definition of a packet or even a container or
  * switch on some other type.
  */
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Type {
     /**
      * The Reference kind would be represented in
@@ -136,10 +141,10 @@ pub enum Type {
      * }
      * ```
      */
-    Call(Box<Type>, HashMap<String, serde_json::Value>),
+    Call(Box<Type>, serde_json::Value),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Field {
     pub name: Option<String>,
     pub r#type: Type,
@@ -153,18 +158,11 @@ impl From<super::json::ProtoDef> for ProtoDef {
     }
 }
 
-fn recursive_add_namespaces(
-    json_ns: &super::json::ProtoDef,
-    path: PathBuf,
-    pds: &mut ProtoDef,
-) {
+fn recursive_add_namespaces(json_ns: &super::json::ProtoDef, path: PathBuf, pds: &mut ProtoDef) {
     for (type_name, type_val) in &json_ns.types {
         let mut type_path = path.to_owned();
         type_path.push(type_name);
-        pds.insert(
-            type_path,
-            type_val.to_owned().into()
-        );
+        pds.0.insert(type_path, type_val.to_owned().into());
     }
     for (sub_name, sub_ns) in &json_ns.sub {
         let mut new_path = path.to_owned();
@@ -177,27 +175,19 @@ impl From<serde_json::Value> for Type {
     fn from(val: serde_json::Value) -> Self {
         match val {
             serde_json::Value::String(s) => Type::Reference(s),
-            serde_json::Value::Array(arr) => match &arr[0] {
-                serde_json::Value::String(s) if s == "container" && arr[1].is_array() => {
+            serde_json::Value::Array(arr) => match (&arr[0], &arr[1]) {
+                (serde_json::Value::String(s), serde_json::Value::Array(fields))
+                    if s == "container" =>
+                {
                     Self::Container(
-                        arr[1]
-                            .as_array()
-                            .unwrap()
+                        fields
                             .to_owned()
                             .into_iter()
                             .map(|v| Field::from(v))
                             .collect(),
                     )
                 }
-                v => Type::Call(
-                    Box::new(Type::from(v.to_owned())),
-                    arr[1]
-                        .as_object()
-                        .unwrap()
-                        .to_owned()
-                        .into_iter()
-                        .collect::<HashMap<_, _>>(),
-                ),
+                (v, val) => Type::Call(Box::new(Type::from(v.to_owned())), val.to_owned()),
             },
             _ => panic!(),
         }
@@ -209,13 +199,26 @@ impl From<serde_json::Value> for Field {
         let obj = v.as_object().unwrap();
         Self {
             name: match obj.get("name") {
-                Some(name) => match name.as_str() {
-                    Some(name) => Some(name.to_owned()),
-                    None => None,
-                },
-                None => None,
+                Some(serde_json::Value::String(name)) => Some(name.to_owned()),
+                _ => None,
             },
             r#type: Type::from(obj.get("type").unwrap().to_owned()),
         }
+    }
+}
+
+impl minecraft_data::FromMCDataVersionDir for ProtoDef {
+    fn from_version_paths(paths: &HashMap<String, String>) -> Option<Self>
+    where
+        Self: Sized,
+    {
+        Some(json::ProtoDef::from_version_paths(paths).unwrap().into())
+    }
+}
+
+#[test]
+fn test() {
+    for v in minecraft_data::supported_versions::SUPPORTED_VERSIONS {
+        println!("{:#?}", ProtoDef::from_version(v));
     }
 }
