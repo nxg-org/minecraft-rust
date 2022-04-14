@@ -92,7 +92,7 @@ mod tests {
     use super::*;
 
     #[allow(overflowing_literals)]
-    const VAR_INT_SAMPLEDATA: [(i32, &'static [u8]); 11] = [
+    const VAR_INT_SAMPLEDATA: [(i32, &[u8]); 11] = [
         /*           0 */ (0x00000000, &[0x00]),
         /*           1 */ (0x00000001, &[0x01]),
         /*           2 */ (0x00000002, &[0x02]),
@@ -124,7 +124,7 @@ mod tests {
 
     #[allow(overflowing_literals)]
     #[rustfmt::skip]
-    const VAR_LONG_SAMPLEDATA: [(i64, &'static [u8]); 11] = [
+    const VAR_LONG_SAMPLEDATA: [(i64, &[u8]); 11] = [
         /*                    0 */ (0x0000000000000000, &[0x00]),
         /*                    1 */ (0x0000000000000001, &[0x01]),
         /*                    2 */ (0x0000000000000002, &[0x02]),
@@ -154,7 +154,7 @@ mod tests {
         }
     }
 
-    const STRING_SAMPLEDATA: [(&'static str, &'static [u8]); 3] = [
+    const STRING_SAMPLEDATA: [(&str, &[u8]); 3] = [
         ("welcome to the test", b"\x13welcome to the test"),
         ("this has to be a little longer string so that we can check if it works when the var_int length changes... writing tests is really fun, isn't it?", b"\x90\x01this has to be a little longer string so that we can check if it works when the var_int length changes... writing tests is really fun, isn't it?"),
         ("some weird utf8 characters: äöü {} ßœæé€²¼⅐™", b";some weird utf8 characters: \xc3\xa4\xc3\xb6\xc3\xbc {} \xc3\x9f\xc5\x93\xc3\xa6\xc3\xa9\xe2\x82\xac\xc2\xb2\xc2\xbc\xe2\x85\x90\xe2\x84\xa2")

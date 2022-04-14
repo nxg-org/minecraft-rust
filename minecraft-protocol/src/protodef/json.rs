@@ -1,4 +1,4 @@
-use minecraft_data::{prelude::MINECRAFT_DATA_DIR, FromMCDataVersionDir};
+use minecraft_data::FromMCDataVersionDir;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -21,20 +21,8 @@ impl FromMCDataVersionDir for Namespace
 where
     Self: Sized,
 {
-    fn from_version_paths(paths: &HashMap<String, String>) -> Option<Self> {
-        let mut path = std::path::PathBuf::from(paths.get("protocol").unwrap());
-        path.push("protocol.json");
-        Some(
-            serde_json::from_str(
-                MINECRAFT_DATA_DIR
-                    .get_file(path)
-                    .unwrap()
-                    .contents_utf8()
-                    .unwrap(),
-            )
-            .unwrap(),
-        )
-    }
+    const MODULE_NAME: &'static str = "protocol";
+    const FILE_NAME: &'static str = "protocol.json";
 }
 
 #[test]

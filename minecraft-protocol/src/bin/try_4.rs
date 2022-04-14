@@ -1,4 +1,3 @@
-#![feature(destructuring_assignment)]
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -53,10 +52,7 @@ impl From<serde_json::Value> for RawField<RawType> {
         let obj = v.as_object().unwrap();
         Self {
             name: match obj.get("name") {
-                Some(name) => match name.as_str() {
-                    Some(name) => Some(name.to_owned()),
-                    None => None,
-                },
+                Some(name) => name.as_str().map(ToOwned::to_owned),
                 None => None,
             },
             r#type: RawType::from(obj.get("type").unwrap().to_owned()),
@@ -67,7 +63,6 @@ impl From<serde_json::Value> for RawField<RawType> {
 trait NativeCodeGen: Fn(Namespace<RawType>) -> Field {}
 
 impl TreeContext<'_, Namespace<RawType>> {
-    
     fn _resolve_field(
         &mut self,
         name: String,
@@ -125,9 +120,9 @@ impl From<serde_json::Value> for RawType {
                         arr[1]
                             .as_array()
                             .unwrap()
-                            .to_owned()
-                            .into_iter()
-                            .map(|v| RawField::from(v))
+                            .iter()
+                            .cloned()
+                            .map(RawField::from)
                             .collect(),
                     )
                 }

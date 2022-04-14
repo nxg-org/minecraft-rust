@@ -15,11 +15,12 @@ rand = "0.8.4"
 serde = "1.0.132"
 serde_json = "1.0.73"
 tokio = { version = "1.14.0", features = ["full"] }
-minecraft-data = {path = "../minecraft-data"}
+minecraft-data = { path = "../minecraft-data" }
 proc-macro2 = "1.0.34"
 lazy_static = "1.4.0"
 indexmap = "1.7.0"
 quote = "1.0.10"
+protodef = { path = "../protodef" }
 
 [build-dependencies]
 convert_case = "0.4.0"

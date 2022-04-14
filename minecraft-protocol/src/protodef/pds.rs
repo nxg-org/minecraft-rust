@@ -1,7 +1,5 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use minecraft_data::FromVersion;
-
 use super::json;
 
 /**
@@ -179,13 +177,7 @@ impl From<serde_json::Value> for Type {
                 (serde_json::Value::String(s), serde_json::Value::Array(fields))
                     if s == "container" =>
                 {
-                    Self::Container(
-                        fields
-                            .to_owned()
-                            .into_iter()
-                            .map(|v| Field::from(v))
-                            .collect(),
-                    )
+                    Self::Container(fields.iter().cloned().map(Field::from).collect())
                 }
                 (v, val) => Type::Call(Box::new(Type::from(v.to_owned())), val.to_owned()),
             },
@@ -207,18 +199,22 @@ impl From<serde_json::Value> for Field {
     }
 }
 
-impl minecraft_data::FromMCDataVersionDir for ProtoDef {
-    fn from_version_paths(paths: &HashMap<String, String>) -> Option<Self>
-    where
-        Self: Sized,
-    {
-        Some(json::ProtoDef::from_version_paths(paths).unwrap().into())
+impl minecraft_data::FromVersion for ProtoDef {
+    fn from_version(paths: &str) -> Option<Self> {
+        Some(
+            <json::ProtoDef as minecraft_data::FromVersion>::from_version(paths)
+                .unwrap()
+                .into(),
+        )
     }
 }
 
 #[test]
 fn test() {
     for v in minecraft_data::supported_versions::SUPPORTED_VERSIONS {
-        println!("{:#?}", ProtoDef::from_version(v));
+        println!(
+            "{:#?}",
+            <ProtoDef as minecraft_data::FromVersion>::from_version(v)
+        );
     }
 }

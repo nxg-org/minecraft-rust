@@ -1,0 +1,455 @@
+#![feature(box_syntax)]
+#![feature(hash_drain_filter)]
+
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    sync::{Arc, Weak}, borrow::Cow,
+};
+
+use serde::Deserialize;
+use serde_json::Value;
+
+pub struct FieldPath<'a>{
+    up: usize,
+    field: Cow<'a, str>,
+}
+
+pub struct Field<'a>{
+    typ: TypePath<'a>,
+    names: Vec<Cow<'a, str>>,
+}
+
+pub struct TypePath<'a>{
+    up: usize,
+    ident: Cow<'a, str>,
+}
+
+// #[derive(Serialize)]
+pub enum JsonType {
+    Native,
+    Call {
+        called_type: String,
+        args: serde_json::Value,
+    },
+    Reference {
+        ref_type: String,
+    },
+}
+
+impl<'de> Deserialize<'de> for JsonType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct JsonTypeVisitor;
+        impl<'de> serde::de::Visitor<'de> for JsonTypeVisitor {
+            type Value = JsonType;
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str(r#"`"native"` for `JsonType::Native`, `"{type}"` for `JsonType::Reference` and `["{type}", ...]` for `JsonType::Reference`"#)
+            }
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(if v == "native" {
+                    Self::Value::Native
+                } else {
+                    Self::Value::Reference {
+                        ref_type: v.to_string(),
+                    }
+                })
+            }
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Ok(if v == "native" {
+                    Self::Value::Native
+                } else {
+                    Self::Value::Reference { ref_type: v }
+                })
+            }
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                if let Ok(Some(called_type)) = seq.next_element::<String>() {
+                    if let Ok(Some(args)) = seq.next_element() {
+                        Ok(Self::Value::Call { called_type, args })
+                    } else {
+                        Err(serde::de::Error::custom(
+                            "missing arguments in call-like protodef type",
+                        ))
+                    }
+                } else {
+                    Err(serde::de::Error::custom(
+                        "missing caller type in call-like protodef type",
+                    ))
+                }
+            }
+        }
+        deserializer.deserialize_any(JsonTypeVisitor)
+    }
+}
+
+/// Namespace = JSON tree
+#[derive(Deserialize)]
+pub struct JsonNamespace {
+    #[serde(default)]
+    pub types: HashMap<String, JsonType>,
+    #[serde(flatten)]
+    pub sub: HashMap<String, JsonNamespace>,
+}
+
+impl Debug for Type<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Native(_) => f.debug_tuple("Native").finish(),
+            Self::Ref(arg0) => f.debug_tuple("Ref").field(arg0).finish(),
+            Self::Tree(arg0) => f.debug_tuple("Tree").field(arg0).finish(),
+            Self::Callable(_) => f.debug_tuple("Callable").finish(),
+            Self::Single(rst) => rst.fmt(f),
+        }
+    }
+}
+
+/*
+
+Planning for the model of this thing
+
+INPUT:
+- immutable view into the linked-list types view
+- &self of type
+
+OUTPUT:
+function? that returns rusttype
+
+rusttype
+-> signature of thing in rust
+    => this has to match for equality, merging
+-> how to parse the thing
+    => this does not
+*/
+
+// #[derive(Debug)]
+pub enum RustType {
+    Option(Box<RustType>),
+    Struct {
+        /// ordered list of fields and their rusttypes
+        sub: Vec<(String, RustType)>,
+    },
+    UnionStruct {
+        /// ordered list of the wrapped rusttypes
+        sub: Vec<RustType>,
+    },
+    /// single type like `u8`
+    Native {
+        aliasing: proc_macro2::TokenStream,
+        // ser: SerializationFn,
+        // de: DeserializationFn,
+    },
+}
+
+macro_rules! version_enum {
+    ($name:ident $path:path, $($version:ident),*) => {
+        pub enum $name {
+            $($version($path::$name)),*
+        }
+    };
+}
+
+impl Debug for RustType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Option(arg0) => f.debug_tuple("Option").field(arg0).finish(),
+            Self::Struct { sub } => f.debug_struct("Struct").field("sub", sub).finish(),
+            Self::UnionStruct { sub } => f.debug_struct("UnionStruct").field("sub", sub).finish(),
+            Self::Native { aliasing } => std::fmt::Display::fmt(&aliasing, f), //f.debug_struct("Native").field("aliasing", ).finish(),
+        }
+    }
+}
+
+struct A {
+    field: A_field,
+}
+type A_field = u32;
+impl ProtoDef for A {
+    type Input = A;
+
+    fn ser(A { field }: Self::Input, buf: &mut impl std::io::Write) -> Result<(), ()> {
+        A_field::ser(field, buf)
+    }
+    fn de(buf: &mut impl std::io::Read) -> Result<Self::Input, ()> {
+        todo!()
+    }
+}
+
+type B_a = u8;
+type B_b = VarInt;
+type B_c = Vec<B__Vec_c>;
+type B__Vec_c = u8;
+type B_d = A;
+type B_e = Vec<B__Vec_e>;
+type B__Vec_e = A;
+// struct B__Vec_e{
+//     field: B__Vec_e_field,
+// }
+// type B__Vec_e_field = u8;
+pub struct B {
+    pub a: <B_a as ProtoDef>::Input,
+    pub b: <B_b as ProtoDef>::Input,
+    pub c: <B_c as ProtoDef>::Input,
+    pub d: <B_d as ProtoDef>::Input,
+    pub e: <B_e as ProtoDef>::Input,
+}
+impl ProtoDef for B {
+    type Input = B;
+
+    fn ser(B { a, b, c, d, e }: Self::Input, buf: &mut impl std::io::Write) -> Result<(), ()> {
+        B_a::ser(a, buf)
+            .and(B_b::ser(b, buf))
+            .and(B_c::ser(c, buf))
+            .and(B_d::ser(d, buf))
+            .and(B_e::ser(e, buf))
+        // .map_err(drop)
+    }
+    fn de(buf: &mut impl std::io::Read) -> Result<Self::Input, ()> {
+        todo!()
+    }
+}
+
+impl<T: ProtoDef> ProtoDef for Vec<T> {
+    type Input = Vec<T::Input>;
+    fn ser(input: Self::Input, buf: &mut impl std::io::Write) -> Result<(), ()> {
+        input
+            .into_iter()
+            .try_for_each(|a| <T as ProtoDef>::ser(a, buf))
+    }
+    fn de(buf: &mut impl std::io::Read) -> Result<Self::Input, ()> {
+        todo!()
+    }
+}
+
+macro_rules! num_impls {
+    ($($num:ident)*) => {
+        $(
+            impl ProtoDef for $num {
+                type Input = $num;
+                fn ser(input: Self::Input, buf: &mut impl std::io::Write) -> Result<(), ()> {
+                    buf.write_all(&input.to_be_bytes()).map_err(drop)
+                }
+                fn de(buf: &mut impl std::io::Read) -> Result<Self::Input, ()> {
+                    todo!()
+                }
+            }
+        )*
+    };
+}
+struct VarInt;
+impl ProtoDef for VarInt {
+    type Input = i32;
+
+    fn ser(input: Self::Input, buf: &mut impl std::io::Write) -> Result<(), ()> {
+        todo!()
+    }
+
+    fn de(buf: &mut impl std::io::Read) -> Result<Self::Input, ()> {
+        todo!()
+    }
+}
+
+num_impls! {
+    u8 u16 u32 u64 u128
+    i8 i16 i32 i64 i128
+    f32 f64
+}
+
+trait ProtoDef {
+    type Input;
+    fn ser(input: Self::Input, buf: &mut impl std::io::Write) -> Result<(), ()>;
+    fn de(buf: &mut impl std::io::Read) -> Result<Self::Input, ()>;
+}
+
+pub type TypeResult<'a> = Result<Type<'a>, ProtoDefError>;
+pub type NativeFn<'a> = fn(&NamespaceTypes<'a>, Option<&Value>) -> TypeResult<'a>;
+pub type Natives<'a> = HashMap<&'a str, NativeFn<'a>>;
+pub type TypeFn<'a> = dyn Fn(&NamespaceTypes<'a>, Option<&Value>) -> TypeResult<'a>;
+
+/// Types are either:
+/// - some native thingymajigger,
+/// - a reference to another one,
+/// - a container like tree of other types, named or
+/// - a dyn function built from other native thingymajiggers
+pub enum Type<'a> {
+    Native(NativeFn<'a>),
+    Ref(Arc<Type<'a>>),
+    Tree(HashMap<&'a str, Arc<Type<'a>>>),
+    Callable(Box<TypeFn<'a>>),
+    Single(RustType),
+}
+
+pub enum Callable<'a> {
+    Native(NativeFn<'a>),
+    Heap(Box<TypeFn<'a>>),
+}
+impl<'a> Type<'a> {
+    pub fn get_callable(&'a self) -> Option<Callable<'a>> {
+        let mut current_ref: &Type = &self;
+        loop {
+            match current_ref {
+                Type::Native(native) => return Some(Callable::Native(*native)),
+                Type::Ref(r) => current_ref = r,
+                Type::Tree(_) => return None,
+                Type::Callable(callable) => {
+                    todo!();
+                    // return Some(Callable::Heap(*callable))
+                },
+                Type::Single(_) => return None,
+            }
+        }
+    }
+}
+
+/*
+
+{
+    "types": {
+        "smth": "u8",
+        "u8": "native",
+    },
+    "some_namespace": {
+        "types": {
+            "useless": "u8",
+        }
+    }
+}
+
+*/
+
+// fn a() {
+//     let a = NamespaceTypes{
+//         inner: HashMap::default(),
+//         parent: Weak::new(),
+//     }
+// }
+
+#[derive(Default)]
+/// Linked List like type view
+pub struct NamespaceTypes<'a> {
+    pub inner: HashMap<String, Arc<Type<'a>>>,
+    pub parent: Weak<NamespaceTypes<'a>>,
+}
+
+impl Debug for NamespaceTypes<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_map().entries(&self.inner).finish()
+    }
+}
+
+impl<'a> NamespaceTypes<'a> {
+    pub fn resolve_type<'b>(&'b self, name: &str) -> Option<Arc<Type<'a>>> {
+        self.inner
+            .get(name)
+            .map(ToOwned::to_owned)
+            .or_else(|| self.parent.upgrade().and_then(|a| a.resolve_type(name)))
+    }
+}
+
+/// Namespace tree
+#[derive(Default, Debug)]
+pub struct Namespace<'a> {
+    pub types: Arc<NamespaceTypes<'a>>,
+    pub sub: HashMap<String, Namespace<'a>>,
+}
+
+#[non_exhaustive]
+#[derive(Debug)]
+pub enum ProtoDefError {
+    NativeNotFound(String),
+    CallWrongType(String),
+    SuppliedArgumentsTakesNone(String),
+    Unresolvable,
+    Other,
+}
+
+impl<'a> TryFrom<(JsonNamespace, &'a Natives<'a>, Weak<NamespaceTypes<'a>>)> for Namespace<'a> {
+    type Error = ProtoDefError;
+    fn try_from(
+        (mut ns, natives, tys): (JsonNamespace, &'a Natives<'a>, Weak<NamespaceTypes<'a>>),
+    ) -> Result<Self, Self::Error> {
+        let mut types = NamespaceTypes {
+            parent: tys,
+            ..Default::default()
+        };
+
+        while !ns.types.is_empty() {
+            let starting_len = ns.types.len();
+            let mut drain = vec![];
+            for (k, v) in &ns.types {
+                if match v {
+                    JsonType::Native if natives.contains_key(&k[..]) => true,
+                    JsonType::Native => {
+                        return Err(ProtoDefError::NativeNotFound(k.to_owned()));
+                    }
+                    JsonType::Call { called_type, .. } => types.resolve_type(called_type).is_some(),
+                    JsonType::Reference { ref_type } => types.resolve_type(ref_type).is_some(),
+                } {
+                    drain.push(k.clone())
+                }
+            }
+            let resolvable = ns.types.drain_filter(|k, _| drain.contains(k));
+            for (k, v) in resolvable {
+                let typ = match v {
+                    JsonType::Native => Type::Native(*natives.get(&k[..]).unwrap()),
+                    JsonType::Call { called_type, args } => {
+                        if let Some(a) = types.resolve_type(&called_type[..])
+                        // .and_then(|a| a.get_callable())
+                        {
+                            // let re = &a;
+                            // match match re.get_callable() {
+                            //     Some(Callable::Native(nat)) => nat(&types, Some(&args)),
+                            //     Some(Callable::Heap(f)) => f(&types, Some(&args)),
+                            //     None => Err(ProtoDefError::CallWrongType(called_type))
+                            // } {
+                            //     Ok(a) => a,
+                            //     Err(e) => return Err(e),
+                            // }
+                            todo!()
+                        } else {
+                            return Err(ProtoDefError::CallWrongType(called_type));
+                        }
+                        // match match &*types.resolve_type(&called_type[..]).unwrap() {
+                        //     Type::Native(nat) => nat(Some(&args)),
+                        //     Type::Callable(callable) => callable(Some(&args)),
+                        //     _ => todo!("fix references"), //return Err(ProtoDefError::CallWrongType(called_type)),
+                        // } {
+                        //     Ok(ty) => ty,
+                        //     Err(e) => return Err(e),
+                        // }
+                    }
+                    JsonType::Reference { ref_type } => {
+                        let resolved_type = types.resolve_type(&ref_type[..]).unwrap();
+                        Type::Ref(resolved_type)
+                    }
+                };
+
+                types.inner.insert(k, Arc::new(typ));
+            }
+            if starting_len == ns.types.len() {
+                return Err(ProtoDefError::Unresolvable);
+            }
+        }
+        let types = Arc::new(types);
+        let mut sub = HashMap::default();
+        for (name, ns) in ns.sub {
+            match Namespace::try_from((ns, natives, Arc::downgrade(&types))) {
+                Ok(ns) => {
+                    sub.insert(name, ns);
+                }
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(Namespace { types, sub })
+    }
+}

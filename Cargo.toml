@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "protodef",
     "minecraft-data",
     "minecraft-protocol",
     "minecraft-examples",

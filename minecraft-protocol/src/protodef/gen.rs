@@ -121,7 +121,7 @@ fn native_switch<'a>(
     };
     let mut enum_code = proc_macro2::TokenStream::default();
     match options.get("compareTo") {
-        Some(serde_json::Value::String(s)) if s.starts_with("$") => {
+        Some(serde_json::Value::String(s)) if s.starts_with('$') => {
             add_placeholder_arg("compareTo", s)
         }
         Some(serde_json::Value::String(s)) => {
@@ -172,11 +172,8 @@ impl Into<proc_macro2::TokenStream> for super::pds::ProtoDef {
 }
 
 fn a(pds_cx: Cx<super::pds::ProtoDef>, type_name: String) {
-    let a = pds_cx
-        .0 
-        .0
-        .get(&pds_cx.1).unwrap();
-    
+    let a = pds_cx.0 .0.get(&pds_cx.1).unwrap();
+
     match a {
         super::pds::Type::Reference(ref_name) => todo!(),
         super::pds::Type::Container(_) => todo!(),
